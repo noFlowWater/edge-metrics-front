@@ -8,7 +8,12 @@ import type {
   BulkReloadResponse,
 } from '~/types/device';
 
-const API_BASE = '/api';
+// 환경변수에서 API URL 가져오기 (Kubernetes 배포 시 설정)
+// 개발 환경: vite.config.ts의 proxy 사용 (/api -> localhost:8081)
+// 프로덕션: 환경변수 API_URL 또는 기본값 /api 사용
+const API_BASE = typeof process !== 'undefined' && process.env.API_URL
+  ? process.env.API_URL
+  : '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
