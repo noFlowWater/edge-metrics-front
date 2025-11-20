@@ -9,6 +9,7 @@ export interface DeviceConfig {
 export type DeviceType =
   | 'jetson_orin'
   | 'jetson_xavier'
+  | 'jetson_nano'  
   | 'jetson'
   | 'raspberry_pi'
   | 'orange_pi'
