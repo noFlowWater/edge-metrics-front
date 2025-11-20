@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { api } from '~/lib/api';
-import type { DeviceState } from '~/types/device';
+import type { DeviceState, KubernetesDeviceResources } from '~/types/device';
 import { StatusBadge } from '~/components/StatusBadge';
 
 export function meta() {
@@ -20,6 +20,9 @@ export default function DeviceDetail() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [k8sResources, setK8sResources] = useState<KubernetesDeviceResources | null>(null);
+  const [k8sLoading, setK8sLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -37,7 +40,22 @@ export default function DeviceDetail() {
         setLoading(false);
       }
     }
+
+    async function fetchK8sResources() {
+      if (!id) return;
+      try {
+        const k8sData = await api.getDeviceKubernetesResources(id);
+        setK8sResources(k8sData);
+      } catch (err) {
+        // K8s may not be available (503), this is acceptable
+        setK8sResources(null);
+      } finally {
+        setK8sLoading(false);
+      }
+    }
+
     fetchData();
+    fetchK8sResources();
   }, [id]);
 
   function handleJsonChange(value: string) {
@@ -86,6 +104,32 @@ export default function DeviceDetail() {
       alert('Reload triggered');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Reload failed');
+    }
+  }
+
+  async function handleK8sSync() {
+    if (!id) return;
+    setSyncing(true);
+    try {
+      await api.syncDevice(id);
+      const k8sData = await api.getDeviceKubernetesResources(id);
+      setK8sResources(k8sData);
+      alert('Kubernetes sync completed');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Kubernetes sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleK8sDelete() {
+    if (!id || !confirm('Are you sure you want to delete Kubernetes resources for this device?')) return;
+    try {
+      await api.deleteDeviceKubernetesResources(id);
+      setK8sResources(null);
+      alert('Kubernetes resources deleted');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete Kubernetes resources');
     }
   }
 
@@ -182,6 +226,93 @@ export default function DeviceDetail() {
               </svg>
               View Metrics Endpoint
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* Kubernetes Resources */}
+      {!k8sLoading && k8sResources && (
+        <div className="rounded-xl shadow-sm p-6 sm:p-8" style={{ backgroundColor: 'var(--color-pastel-card)', border: '1px solid var(--color-pastel-border)' }}>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold" style={{ color: 'var(--color-pastel-text)' }}>Kubernetes Resources</h2>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleK8sSync}
+                disabled={syncing}
+                className="px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity font-medium text-sm"
+                style={{
+                  backgroundColor: 'var(--color-pastel-primary-lighter)',
+                  color: 'var(--color-pastel-primary)'
+                }}
+              >
+                {syncing ? 'Syncing...' : 'Sync to K8s'}
+              </button>
+              <button
+                onClick={handleK8sDelete}
+                className="px-5 py-2 rounded-lg hover:opacity-90 transition-opacity font-medium text-sm"
+                style={{
+                  backgroundColor: 'var(--color-pastel-danger-bg)',
+                  border: '1px solid var(--color-pastel-danger-light)',
+                  color: 'var(--color-pastel-danger)'
+                }}
+              >
+                Delete K8s Resources
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            {/* Service */}
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-pastel-text-muted)' }}>Service</p>
+                <span className={`text-xs px-2 py-1 rounded ${k8sResources.service.exists ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {k8sResources.service.exists ? 'EXISTS' : 'NOT FOUND'}
+                </span>
+              </div>
+              {k8sResources.service.exists && (
+                <div className="pl-4 space-y-2 text-sm" style={{ color: 'var(--color-pastel-text)' }}>
+                  <p><strong>Name:</strong> {k8sResources.service.name}</p>
+                  {k8sResources.service.cluster_ip && <p><strong>Cluster IP:</strong> {k8sResources.service.cluster_ip}</p>}
+                  {k8sResources.service.ports && k8sResources.service.ports.length > 0 && (
+                    <p><strong>Ports:</strong> {k8sResources.service.ports.map(p => `${p.name}:${p.port}`).join(', ')}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Endpoints */}
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-pastel-text-muted)' }}>Endpoints</p>
+                <span className={`text-xs px-2 py-1 rounded ${k8sResources.endpoints.exists ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {k8sResources.endpoints.exists ? 'EXISTS' : 'NOT FOUND'}
+                </span>
+              </div>
+              {k8sResources.endpoints.exists && (
+                <div className="pl-4 space-y-2 text-sm" style={{ color: 'var(--color-pastel-text)' }}>
+                  <p><strong>Name:</strong> {k8sResources.endpoints.name}</p>
+                  {k8sResources.endpoints.ready_addresses && k8sResources.endpoints.ready_addresses.length > 0 && (
+                    <p><strong>Ready Addresses:</strong> {k8sResources.endpoints.ready_addresses.join(', ')}</p>
+                  )}
+                  {k8sResources.endpoints.not_ready_addresses && k8sResources.endpoints.not_ready_addresses.length > 0 && (
+                    <p style={{ color: 'var(--color-pastel-danger)' }}>
+                      <strong>Not Ready:</strong> {k8sResources.endpoints.not_ready_addresses.join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Prometheus Target */}
+            {k8sResources.prometheus_target && (
+              <div className="pt-4" style={{ borderTop: '1px solid var(--color-pastel-border)' }}>
+                <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--color-pastel-text-muted)' }}>Prometheus Target</p>
+                <code className="text-sm px-3 py-2 rounded block" style={{ backgroundColor: '#f8f9fc', color: 'var(--color-pastel-text)' }}>
+                  {k8sResources.prometheus_target}
+                </code>
+              </div>
+            )}
           </div>
         </div>
       )}

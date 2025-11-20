@@ -66,3 +66,75 @@ export interface BulkReloadResponse {
   success: number;
   failed: number;
 }
+
+// Kubernetes types
+export interface KubernetesResourceStatus {
+  device_id: string;
+  service_exists: boolean;
+  endpoints_exists: boolean;
+}
+
+export interface KubernetesStatus {
+  kubernetes_enabled: boolean;
+  namespace: string;
+  total_k8s_resources: number;
+  total_registered_devices: number;
+  synced: number;
+  unsynced: number;
+  resources: KubernetesResourceStatus[];
+}
+
+export interface KubernetesHealth {
+  kubernetes_available: boolean;
+  client_initialized: boolean;
+  namespace_accessible: boolean;
+  rbac_permissions: {
+    namespace?: string;
+    services?: string;
+    endpoints?: string;
+  };
+}
+
+export interface SyncResult {
+  device_id: string;
+  service: string;
+  status: string;
+  error?: string;
+}
+
+export interface KubernetesSyncResponse {
+  status: string;
+  created: SyncResult[];
+  updated: SyncResult[];
+  deleted: SyncResult[];
+  failed: SyncResult[];
+  total_healthy: number;
+}
+
+export interface KubernetesServiceInfo {
+  name: string;
+  exists: boolean;
+  cluster_ip?: string;
+  ports?: Array<{ name: string; port: number }>;
+}
+
+export interface KubernetesEndpointsInfo {
+  name: string;
+  exists: boolean;
+  ready_addresses?: string[];
+  not_ready_addresses?: string[];
+}
+
+export interface KubernetesDeviceResources {
+  device_id: string;
+  service: KubernetesServiceInfo;
+  endpoints: KubernetesEndpointsInfo;
+  prometheus_target?: string;
+}
+
+export interface KubernetesCleanupResponse {
+  status: string;
+  deleted_services: string[];
+  deleted_endpoints: string[];
+  namespace: string;
+}

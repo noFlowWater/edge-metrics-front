@@ -6,6 +6,12 @@ import type {
   HealthResponse,
   DeviceState,
   BulkReloadResponse,
+  KubernetesStatus,
+  KubernetesHealth,
+  KubernetesSyncResponse,
+  KubernetesDeviceResources,
+  KubernetesCleanupResponse,
+  SyncResult,
 } from '~/types/device';
 
 // 환경변수에서 API URL 가져오기 (Kubernetes 배포 시 설정)
@@ -79,4 +85,41 @@ export const api = {
 
   // Metrics
   getMetricsSummary: () => request<MetricsSummary>('/metrics/summary'),
+
+  // Kubernetes
+  getKubernetesStatus: (namespace: string = 'monitoring') =>
+    request<KubernetesStatus>(`/kubernetes/status?namespace=${namespace}`),
+
+  getKubernetesHealth: (namespace: string = 'monitoring') =>
+    request<KubernetesHealth>(`/kubernetes/health?namespace=${namespace}`),
+
+  syncAllDevices: (namespace: string = 'monitoring') =>
+    request<KubernetesSyncResponse>('/kubernetes/sync', {
+      method: 'POST',
+      body: JSON.stringify({ namespace }),
+    }),
+
+  syncDevice: (deviceId: string, namespace: string = 'monitoring') =>
+    request<SyncResult>(`/kubernetes/sync/${deviceId}?namespace=${namespace}`, {
+      method: 'POST',
+    }),
+
+  getKubernetesManifests: (namespace: string = 'monitoring') =>
+    fetch(`${API_BASE}/kubernetes/manifests?namespace=${namespace}`).then(res => {
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      return res.text();
+    }),
+
+  getDeviceKubernetesResources: (deviceId: string, namespace: string = 'monitoring') =>
+    request<KubernetesDeviceResources>(`/kubernetes/resources/${deviceId}?namespace=${namespace}`),
+
+  deleteDeviceKubernetesResources: (deviceId: string, namespace: string = 'monitoring') =>
+    request<SyncResult>(`/kubernetes/resources/${deviceId}?namespace=${namespace}`, {
+      method: 'DELETE',
+    }),
+
+  cleanupKubernetesResources: (namespace: string = 'monitoring') =>
+    request<KubernetesCleanupResponse>(`/kubernetes/cleanup?namespace=${namespace}`, {
+      method: 'DELETE',
+    }),
 };

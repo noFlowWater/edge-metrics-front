@@ -40,6 +40,20 @@ export function Layout() {
                 >
                   Devices
                 </NavLink>
+                <NavLink
+                  to="/kubernetes"
+                  className={({ isActive }) =>
+                    `px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isActive ? '' : 'hover:bg-opacity-10'
+                    }`
+                  }
+                  style={({ isActive }) => ({
+                    backgroundColor: isActive ? 'var(--color-pastel-primary)' : 'transparent',
+                    color: isActive ? 'white' : 'var(--color-pastel-text-light)',
+                  })}
+                >
+                  Kubernetes
+                </NavLink>
               </div>
             </div>
           </div>
