@@ -13,5 +13,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
+    // Ignore Chrome DevTools requests
+    middlewareMode: false,
   },
 });

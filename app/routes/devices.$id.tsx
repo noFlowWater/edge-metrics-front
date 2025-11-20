@@ -164,6 +164,25 @@ export default function DeviceDetail() {
               </div>
             )}
           </div>
+
+          {/* Metrics Endpoint Link */}
+          <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--color-pastel-border)' }}>
+            <a
+              href={`http://${status.ip_address}:${status.port}/metrics`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-lg hover:opacity-90 transition-opacity font-medium text-sm"
+              style={{
+                backgroundColor: 'var(--color-pastel-primary-lighter)',
+                color: 'var(--color-pastel-primary)'
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              View Metrics Endpoint
+            </a>
+          </div>
         </div>
       )}
 
