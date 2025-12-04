@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { api } from '~/lib/api';
-import type { DeviceState, KubernetesDeviceResources } from '~/types/device';
+import type { DeviceState, DeviceLocalConfig, KubernetesDeviceResources } from '~/types/device';
 import { StatusBadge } from '~/components/StatusBadge';
+import EditDeviceModal from '~/components/EditDeviceModal';
 
 export function meta() {
   return [
@@ -23,6 +24,15 @@ export default function DeviceDetail() {
   const [k8sResources, setK8sResources] = useState<KubernetesDeviceResources | null>(null);
   const [k8sLoading, setK8sLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+
+  // Device Local Config 관련 state
+  const [deviceConfig, setDeviceConfig] = useState<DeviceLocalConfig | null>(null);
+  const [deviceConfigJson, setDeviceConfigJson] = useState('');
+  const [loadingDeviceConfig, setLoadingDeviceConfig] = useState(false);
+  const [deviceConfigError, setDeviceConfigError] = useState<string | null>(null);
+
+  // Edit Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -58,29 +68,24 @@ export default function DeviceDetail() {
     fetchK8sResources();
   }, [id]);
 
-  function handleJsonChange(value: string) {
-    setConfigJson(value);
-    try {
-      JSON.parse(value);
-      setJsonError(null);
-    } catch {
-      setJsonError('Invalid JSON');
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!id || jsonError) return;
+    if (!id || !deviceConfigJson) {
+      alert('No device config loaded');
+      return;
+    }
+    if (jsonError) return;
 
     setSaving(true);
     try {
-      const config = JSON.parse(configJson);
+      const config = JSON.parse(deviceConfigJson);
       await api.updateConfig(id, config);
+      // 서버 config 다시 로드
       const updatedConfig = await api.getConfig(id);
       setConfigJson(JSON.stringify(updatedConfig, null, 2));
-      alert('Configuration saved');
+      alert('Configuration saved successfully');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save');
+      alert(err instanceof Error ? err.message : 'Failed to save configuration');
     } finally {
       setSaving(false);
     }
@@ -133,6 +138,46 @@ export default function DeviceDetail() {
     }
   }
 
+  async function handleLoadFromDevice() {
+    if (!id) return;
+
+    setLoadingDeviceConfig(true);
+    setDeviceConfigError(null);
+
+    try {
+      const localConfig = await api.getDeviceLocalConfig(id);
+      setDeviceConfig(localConfig);
+      setDeviceConfigJson(JSON.stringify(localConfig, null, 2));
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load device config';
+      setDeviceConfigError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setLoadingDeviceConfig(false);
+    }
+  }
+
+  async function handleEditSave(data: {
+    device_type: string;
+    ip_address: string;
+    port: number;
+    reload_port: number;
+  }) {
+    if (!id) return;
+
+    await api.patchDevice(id, data);
+
+    // Refresh device status and config
+    const [configData, statusData] = await Promise.all([
+      api.getConfig(id),
+      api.getDeviceStatus(id),
+    ]);
+    setConfigJson(JSON.stringify(configData, null, 2));
+    setStatus(statusData);
+
+    alert('Device updated successfully (reload not triggered)');
+  }
+
   if (loading) {
     return <div className="text-center py-8" style={{ color: 'var(--color-pastel-text-light)' }}>Loading...</div>;
   }
@@ -158,6 +203,16 @@ export default function DeviceDetail() {
           <h1 className="text-3xl lg:text-4xl font-bold mt-3" style={{ color: 'var(--color-pastel-text)' }}>{id}</h1>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="px-6 py-3 rounded-lg hover:opacity-90 transition-opacity font-medium whitespace-nowrap"
+            style={{
+              backgroundColor: 'var(--color-pastel-primary)',
+              color: 'white'
+            }}
+          >
+            Edit
+          </button>
           <button
             onClick={handleReload}
             className="px-6 py-3 rounded-lg hover:opacity-90 transition-opacity font-medium whitespace-nowrap"
@@ -317,41 +372,126 @@ export default function DeviceDetail() {
         </div>
       )}
 
-      {/* Config JSON Editor */}
-      <form onSubmit={handleSubmit} className="rounded-xl shadow-sm p-6 sm:p-8 space-y-6" style={{ backgroundColor: 'var(--color-pastel-card)', border: '1px solid var(--color-pastel-border)' }}>
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <h2 className="text-lg sm:text-xl font-semibold" style={{ color: 'var(--color-pastel-text)' }}>Configuration</h2>
-          {jsonError && (
-            <span className="text-sm font-medium" style={{ color: 'var(--color-pastel-danger)' }}>{jsonError}</span>
-          )}
-        </div>
+      {/* Configuration Section */}
+      <div className="rounded-xl shadow-sm p-6 sm:p-8 space-y-8" style={{ backgroundColor: 'var(--color-pastel-card)', border: '1px solid var(--color-pastel-border)' }}>
+        <h2 className="text-lg sm:text-xl font-semibold" style={{ color: 'var(--color-pastel-text)' }}>Configuration</h2>
 
-        <textarea
-          value={configJson}
-          onChange={(e) => handleJsonChange(e.target.value)}
-          className="block w-full h-80 sm:h-96 rounded-lg px-4 sm:px-5 py-3 sm:py-4 font-mono text-sm focus:outline-none resize-y"
-          style={{
-            backgroundColor: '#f8f9fc',
-            border: '1px solid var(--color-pastel-border)',
-            color: 'var(--color-pastel-text)'
-          }}
-          spellCheck={false}
-        />
-
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={saving || !!jsonError}
-            className="w-full sm:w-auto px-6 py-3 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity font-medium"
+        {/* Server Configuration (읽기 전용) */}
+        <div>
+          <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--color-pastel-text)' }}>
+            Server Configuration (Database)
+          </h3>
+          <div
+            className="rounded-lg p-4 font-mono text-sm overflow-auto"
             style={{
-              backgroundColor: 'var(--color-pastel-primary)',
-              color: 'white'
+              backgroundColor: '#f8f9fc',
+              border: '1px solid var(--color-pastel-border)',
+              maxHeight: '300px'
             }}
           >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+            <pre style={{ color: 'var(--color-pastel-text)' }}>{configJson}</pre>
+          </div>
+          <p className="text-sm mt-2" style={{ color: 'var(--color-pastel-text-muted)' }}>
+            This is the configuration stored in the server database
+          </p>
         </div>
-      </form>
+
+        {/* Device Local Configuration (편집 가능) */}
+        <div>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3">
+            <h3 className="text-base font-semibold" style={{ color: 'var(--color-pastel-text)' }}>
+              Device Local Configuration
+            </h3>
+            <button
+              onClick={handleLoadFromDevice}
+              disabled={loadingDeviceConfig}
+              className="px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity font-medium text-sm whitespace-nowrap"
+              style={{
+                backgroundColor: 'var(--color-pastel-primary)',
+                color: 'white'
+              }}
+            >
+              {loadingDeviceConfig ? 'Loading...' : 'Load from Device'}
+            </button>
+          </div>
+
+          {deviceConfigError && (
+            <div
+              className="p-3 rounded-lg mb-3"
+              style={{
+                backgroundColor: 'var(--color-pastel-danger-bg)',
+                color: 'var(--color-pastel-danger)'
+              }}
+            >
+              {deviceConfigError}
+            </div>
+          )}
+
+          {deviceConfig ? (
+            <form onSubmit={handleSubmit}>
+              <textarea
+                value={deviceConfigJson}
+                onChange={(e) => {
+                  setDeviceConfigJson(e.target.value);
+                  try {
+                    JSON.parse(e.target.value);
+                    setJsonError(null);
+                  } catch {
+                    setJsonError('Invalid JSON');
+                  }
+                }}
+                className="block w-full h-80 sm:h-96 rounded-lg px-4 sm:px-5 py-3 sm:py-4 font-mono text-sm focus:outline-none resize-y"
+                style={{
+                  backgroundColor: '#f8f9fc',
+                  border: '1px solid var(--color-pastel-border)',
+                  color: 'var(--color-pastel-text)'
+                }}
+                spellCheck={false}
+              />
+              {jsonError && (
+                <p className="text-sm mt-2" style={{ color: 'var(--color-pastel-danger)' }}>
+                  {jsonError}
+                </p>
+              )}
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  type="submit"
+                  disabled={saving || !!jsonError}
+                  className="px-6 py-3 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity font-medium"
+                  style={{
+                    backgroundColor: 'var(--color-pastel-primary)',
+                    color: 'white'
+                  }}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div
+              className="p-8 text-center rounded-lg"
+              style={{
+                backgroundColor: '#f8f9fc',
+                border: '1px solid var(--color-pastel-border)'
+              }}
+            >
+              <p style={{ color: 'var(--color-pastel-text-muted)' }}>
+                Click "Load from Device" to fetch the actual config from the edge device
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Edit Device Modal */}
+      {status && (
+        <EditDeviceModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          device={status}
+          onSave={handleEditSave}
+        />
+      )}
     </div>
   );
 }

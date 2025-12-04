@@ -4,6 +4,7 @@ import { api } from '~/lib/api';
 
 const DEFAULT_CONFIG = {
   device_type: 'jetson_orin',
+  ip_address: '',
   port: 9100,
   reload_port: 9101,
 };
@@ -18,6 +19,7 @@ export function meta() {
 export default function AddDevice() {
   const navigate = useNavigate();
   const [deviceId, setDeviceId] = useState('');
+  const [ipAddress, setIpAddress] = useState('');
   const [configJson, setConfigJson] = useState(JSON.stringify(DEFAULT_CONFIG, null, 2));
   const [saving, setSaving] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -36,6 +38,10 @@ export default function AddDevice() {
     e.preventDefault();
     if (!deviceId.trim()) {
       alert('Device ID is required');
+      return;
+    }
+    if (!ipAddress.trim()) {
+      alert('IP Address is required');
       return;
     }
     if (jsonError) return;
@@ -69,6 +75,30 @@ export default function AddDevice() {
             value={deviceId}
             onChange={(e) => setDeviceId(e.target.value)}
             placeholder="e.g., edge-01"
+            className="block w-full rounded-lg px-4 sm:px-5 py-3 focus:outline-none"
+            style={{
+              backgroundColor: 'var(--color-pastel-bg)',
+              border: '1px solid var(--color-pastel-border)',
+              color: 'var(--color-pastel-text)'
+            }}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-3" style={{ color: 'var(--color-pastel-text)' }}>IP Address</label>
+          <input
+            type="text"
+            value={ipAddress}
+            onChange={(e) => {
+              setIpAddress(e.target.value);
+              try {
+                const config = JSON.parse(configJson);
+                config.ip_address = e.target.value;
+                setConfigJson(JSON.stringify(config, null, 2));
+              } catch {}
+            }}
+            placeholder="e.g., 155.230.34.203"
             className="block w-full rounded-lg px-4 sm:px-5 py-3 focus:outline-none"
             style={{
               backgroundColor: 'var(--color-pastel-bg)',

@@ -6,6 +6,19 @@ export interface DeviceConfig {
   [key: string]: any; // Allow dynamic fields
 }
 
+// Device Local Config (exporter에서 반환하는 형식)
+export interface DeviceLocalConfig {
+  device_type: string;
+  interval?: number;
+  port: number;
+  reload_port: number;
+  metrics?: Record<string, boolean>;
+  shelly?: any;
+  jetson?: any;
+  ina260?: any;
+  [key: string]: any; // Allow additional fields
+}
+
 export type DeviceType =
   | 'jetson_orin'
   | 'jetson_xavier'

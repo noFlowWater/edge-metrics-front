@@ -1,5 +1,6 @@
 import type {
   DeviceConfig,
+  DeviceLocalConfig,
   DevicesResponse,
   ConfigsResponse,
   MetricsSummary,
@@ -75,6 +76,22 @@ export const api = {
   getDevices: () => request<DevicesResponse>('/devices'),
   getDeviceStatus: (deviceId: string) =>
     request<DeviceState>(`/devices/${deviceId}/status`),
+  patchDevice: (
+    deviceId: string,
+    data: {
+      device_type?: string;
+      ip_address?: string;
+      port?: number;
+      reload_port?: number;
+    }
+  ) =>
+    request<{ status: string; device_id: string; message: string }>(
+      `/devices/${deviceId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    ),
   reloadDevice: (deviceId: string) =>
     request<{ status: string; device_id: string; error?: string }>(
       `/devices/${deviceId}/reload`,
@@ -82,6 +99,10 @@ export const api = {
     ),
   reloadAllDevices: () =>
     request<BulkReloadResponse>('/devices/reload', { method: 'POST' }),
+
+  // Device Local Config (서버를 통해 프록시로 가져오기 - CORS 회피)
+  getDeviceLocalConfig: (deviceId: string) =>
+    request<DeviceLocalConfig>(`/devices/${deviceId}/local-config`),
 
   // Metrics
   getMetricsSummary: () => request<MetricsSummary>('/metrics/summary'),

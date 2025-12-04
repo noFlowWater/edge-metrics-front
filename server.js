@@ -14,7 +14,7 @@ app.use(
     pathRewrite: {
       "^/api": "",
     },
-    onProxyReq: (proxyReq, req, res) => {
+    onProxyReq: (_proxyReq, req) => {
       console.log(`[Proxy] ${req.method} ${req.url} -> ${BACKEND_URL}${req.url.replace(/^\/api/, "")}`);
     },
     onError: (err, req, res) => {
